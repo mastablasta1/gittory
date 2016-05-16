@@ -1,8 +1,8 @@
-package pl.edu.agh.idziak.gittory.logic;
+package pl.edu.agh.idziak.gittory.util;
 
 import javafx.util.Pair;
 
-import java.util.LinkedList;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -16,8 +16,8 @@ public class StringLayout {
     public StringLayout(String str) {
         string = str;
 
-        lineList = new LinkedList<>();
         String[] lines = string.split("(?<=\n)");
+        lineList = new ArrayList<>(lines.length);
 
         int pos = 0;
         for (String line : lines) {
@@ -35,12 +35,16 @@ public class StringLayout {
         return string;
     }
 
-    public int toGlobalPosition(int row, int col) {
-        Pair<Integer, Integer> lineInfo = lineList.get(row - 1);
-        if (lineInfo == null)
-            throw new IllegalArgumentException("No line with nr " + row);
-        if (lineInfo.getValue() <= col)
-            throw new IllegalArgumentException("Column exceeds accual line length " + lineInfo.getValue() + "/" + col);
-        return lineInfo.getKey() + col - 1;
+    public Pair<Integer, Integer> getLineAndColumn(int pos) {
+        int i = 1;
+        for (Pair<Integer, Integer> lineAndCol : lineList) {
+            Integer linePos = lineAndCol.getKey();
+            Integer lineLength = lineAndCol.getValue();
+            if (linePos + lineLength > pos) {
+                return new Pair<>(i, pos - linePos + 1);
+            }
+            i++;
+        }
+        throw new IllegalArgumentException("Position exceeds string length");
     }
 }

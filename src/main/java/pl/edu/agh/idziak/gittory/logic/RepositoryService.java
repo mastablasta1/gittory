@@ -2,6 +2,7 @@ package pl.edu.agh.idziak.gittory.logic;
 
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.storage.file.FileRepositoryBuilder;
+import pl.edu.agh.idziak.gittory.util.Observable;
 
 import java.io.File;
 import java.io.IOException;

@@ -1,16 +1,18 @@
 package pl.edu.agh.idziak.gittory.gui.root.codearea;
 
+import javafx.geometry.Point2D;
+import javafx.scene.input.MouseButton;
+import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.StackPane;
+import javafx.util.Pair;
 import org.fxmisc.flowless.VirtualizedScrollPane;
-import org.fxmisc.richtext.CodeArea;
-import org.fxmisc.richtext.LineNumberFactory;
-import org.fxmisc.richtext.StyleSpans;
-import org.fxmisc.richtext.StyleSpansBuilder;
+import org.fxmisc.richtext.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import pl.edu.agh.idziak.gittory.logic.ActiveCodeSpan;
-import pl.edu.agh.idziak.gittory.logic.StringLayout;
+import pl.edu.agh.idziak.gittory.util.StringLayout;
 
+import java.time.Duration;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -25,6 +27,8 @@ public class CodeAreaHandler {
     private CodeArea codeArea;
     private ArrayList<ActiveCodeSpan> activeCodeSpans;
     private boolean highlightJavaCode;
+    private Integer lastMouseOverTextPosition;
+    private StringLayout currentStringLayout;
 
     public CodeAreaHandler(StackPane codeAreaStackPane) {
         codeArea = new CodeArea();
@@ -35,6 +39,41 @@ public class CodeAreaHandler {
         codeArea.richChanges()
                 .filter(ch -> !ch.getInserted().equals(ch.getRemoved()))
                 .subscribe(change -> codeArea.setStyleSpans(0, computeHighlighting(codeArea.getText())));
+
+        codeArea.setMouseOverTextDelay(Duration.ofMillis(10));
+        codeArea.addEventHandler(MouseOverTextEvent.MOUSE_OVER_TEXT_BEGIN, event -> {
+            lastMouseOverTextPosition = event.getCharacterIndex();
+        });
+        codeArea.addEventHandler(MouseOverTextEvent.MOUSE_OVER_TEXT_END, event -> {
+            //lastMouseOverTextPosition = null;
+        });
+        codeArea.addEventHandler(MouseEvent.MOUSE_CLICKED, this::handleClickEvent);
+        codeArea.addEventHandler(MouseEvent.MOUSE_EXITED, event -> {
+            lastMouseOverTextPosition = null;
+        });
+    }
+
+    private void handleClickEvent(MouseEvent event) {
+        if (!event.isControlDown()
+                || event.getButton() != MouseButton.PRIMARY
+                || lastMouseOverTextPosition == null) {
+            return;
+        }
+
+        ActiveCodeSpan clickedActiveSpan = findClickedActiveSpan(lastMouseOverTextPosition);
+        if (clickedActiveSpan != null && clickedActiveSpan.getCallback() != null) {
+            clickedActiveSpan.getCallback().accept(new Point2D(event.getScreenX(), event.getScreenY()));
+        }
+    }
+
+    private ActiveCodeSpan findClickedActiveSpan(int position) {
+        Pair<Integer, Integer> lineAndColumn = currentStringLayout.getLineAndColumn(position);
+
+        return activeCodeSpans.stream().filter(activeCodeSpan ->
+                lineAndColumn.getKey() == activeCodeSpan.getLine()
+                        && lineAndColumn.getValue() >= activeCodeSpan.getStartCol()
+                        && lineAndColumn.getValue() <= activeCodeSpan.getEndCol())
+                .findAny().orElse(null);
     }
 
     public void replaceWithPlainText(String newText) {
@@ -59,7 +98,7 @@ public class CodeAreaHandler {
     }
 
     private void buildJavaStyleSpans(String text, StyleSpansBuilder<Collection<String>> spansBuilder) {
-        StringLayout stringLayout = new StringLayout(text);
+        currentStringLayout = new StringLayout(text);
         Matcher matcher = PATTERN.matcher(text);
         int lastKeywordEnd = 0;
         while (matcher.find()) {
@@ -77,7 +116,7 @@ public class CodeAreaHandler {
             spansBuilder.add(Collections.emptyList(), matcher.start() - lastKeywordEnd);
 
             if (styleClass.equals("qualifier")) {
-                if (isActiveCodeSpan(matcher.start(), matcher.end())) {
+                if (isActiveCodeSpan(matcher, currentStringLayout)) {
                     styleClass = "active-qualifier";
                 }
             }
@@ -87,11 +126,18 @@ public class CodeAreaHandler {
         spansBuilder.add(Collections.emptyList(), text.length() - lastKeywordEnd);
     }
 
-    private boolean isActiveCodeSpan(int start, int end) {
-        Optional<ActiveCodeSpan> span = activeCodeSpans.stream()
-                .filter(s -> s.getStartCol() == start && s.getEndCol() == end)
+    private boolean isActiveCodeSpan(Matcher matcher, StringLayout stringLayout) {
+        Pair<Integer, Integer> startLineAndCol = stringLayout.getLineAndColumn(matcher.start());
+        Pair<Integer, Integer> endLineAndCol = stringLayout.getLineAndColumn(matcher.end() - 1);
+
+        Optional<ActiveCodeSpan> matchingSpan = activeCodeSpans.stream().filter(span ->
+                span.getLine() == startLineAndCol.getKey()
+                        && span.getStartCol() == startLineAndCol.getValue()
+                        && span.getLine() == endLineAndCol.getKey()
+                        && span.getEndCol() == endLineAndCol.getValue())
                 .findAny();
-        return span.isPresent();
+
+        return matchingSpan.isPresent();
     }
 
     private static final String[] JAVA_KEYWORDS = new String[]{

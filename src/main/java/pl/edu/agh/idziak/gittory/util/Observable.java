@@ -1,4 +1,4 @@
-package pl.edu.agh.idziak.gittory.logic;
+package pl.edu.agh.idziak.gittory.util;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

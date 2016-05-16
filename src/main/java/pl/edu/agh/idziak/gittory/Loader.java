@@ -10,14 +10,14 @@ import pl.edu.agh.idziak.gittory.gui.root.codearea.CodeAreaHandler;
 /**
  * Created by Tomasz on 13.05.2016.
  */
-public class Loader extends Application{
+public class Loader extends Application {
 
     public void start(Stage primaryStage) throws Exception {
         primaryStage.setTitle("Gittory 0.1");
 
         RootView rootView = new RootView();
 
-        Scene scene = new Scene(rootView.getView());
+        Scene scene = new Scene(rootView.getView(), 800, 600);
 
         scene.getStylesheets().add(CodeAreaHandler.class.getResource("java-keywords.css").toExternalForm());
         primaryStage.setScene(scene);

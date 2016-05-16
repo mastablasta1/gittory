@@ -5,16 +5,16 @@ import javafx.scene.control.TreeCell;
 import javafx.scene.control.TreeItem;
 import javafx.scene.control.TreeView;
 import javafx.scene.input.MouseEvent;
-import org.eclipse.jgit.lib.Repository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import pl.edu.agh.idziak.gittory.logic.Event;
-import pl.edu.agh.idziak.gittory.logic.Observable;
+import pl.edu.agh.idziak.gittory.util.Observable;
 import pl.edu.agh.idziak.gittory.logic.RepositoryHandle;
 import pl.edu.agh.idziak.gittory.logic.RepositoryService;
 
 import java.io.File;
 import java.io.FilenameFilter;
+import java.util.Optional;
 import java.util.function.Consumer;
 
 /**
@@ -23,11 +23,11 @@ import java.util.function.Consumer;
 public class RepoTreeViewHandler {
     private static final Logger LOG = LoggerFactory.getLogger(RepoTreeViewHandler.class);
 
-    private TreeView<RepoTreeItem> treeView;
+    private TreeView<ItemContent> treeView;
     private RepositoryService service;
-    private Observable<Event<File>> fileEventObservable = new Observable<>();
+    private Observable<Event<ItemContent>> fileEventObservable = new Observable<>();
 
-    public RepoTreeViewHandler(TreeView<RepoTreeItem> treeView, RepositoryService service) {
+    public RepoTreeViewHandler(TreeView<ItemContent> treeView, RepositoryService service) {
         this.service = service;
         this.treeView = treeView;
 
@@ -35,7 +35,7 @@ public class RepoTreeViewHandler {
 
         service.addChangeListener(event -> {
             if (event.getType() == Event.Type.REPOSITORIES_CHANGED) {
-                updateView();
+                updateTree();
             }
         });
     }
@@ -45,73 +45,91 @@ public class RepoTreeViewHandler {
         treeView.setShowRoot(false);
 
         treeView.setCellFactory(treeView -> {
-            TreeCell<RepoTreeItem> treeCell = new RepoTreeCell();
+            TreeCell<ItemContent> treeCell = new RepoTreeCell();
             treeCell.setOnMouseClicked(getTreeCellMouseEventHandler(treeCell));
             return treeCell;
         });
 
-        TreeItem<RepoTreeItem> root = new TreeItem<>();
+        TreeItem<ItemContent> root = new TreeItem<>();
         root.setExpanded(true);
         treeView.setRoot(root);
 
-        buildTree();
+        updateTree();
     }
 
-    public void addFileEventListener(Consumer<Event<File>> observer) {
+    public void addFileEventListener(Consumer<Event<ItemContent>> observer) {
         fileEventObservable.addObserver(observer);
     }
 
-    private EventHandler<MouseEvent> getTreeCellMouseEventHandler(TreeCell<RepoTreeItem> treeCell) {
+    private EventHandler<MouseEvent> getTreeCellMouseEventHandler(TreeCell<ItemContent> treeCell) {
         return event -> {
-            TreeItem<RepoTreeItem> treeItem = treeCell.getTreeItem();
+            TreeItem<ItemContent> treeItem = treeCell.getTreeItem();
             if (treeItem == null || treeItem.getValue() == null) {
                 return;
             }
+            ItemContent itemContent = treeItem.getValue();
 
             if (event.getClickCount() == 2) {
-                File file = treeItem.getValue().getFile();
-                if (file.isDirectory()) {
-                    listDirectoryItem(treeItem, file);
-                } else {
-                    fileEventObservable.publishEvent(Event.<File>builder().type(Event.Type.FILE_DOUBLE_CLICKED).payload(file).build());
+                if (itemContent.isFile()) {
+                    fileEventObservable.publishEvent(Event.<ItemContent>builder()
+                            .type(Event.Type.FILE_DOUBLE_CLICKED)
+                            .payload(itemContent)
+                            .build());
                 }
             }
         };
     }
 
-
-    private void listDirectoryItem(TreeItem<RepoTreeItem> dirItem, File dir) {
-        if (!dir.isDirectory() || !dirItem.getChildren().isEmpty()) {
-            return;
-        }
-        File[] files = dir.listFiles(gitFolderFilter);
-        LOG.info("Listed folder " + dir);
-        if (files == null) {
-            LOG.warn("Could not list folder");
-            return;
-        }
-        dirItem.getChildren().clear();
-        for (File f : files) {
-            dirItem.getChildren().add(new TreeItem<>(new RepoTreeItem(f)));
-        }
-        dirItem.setExpanded(true);
-    }
-
-    private void buildTree() {
-        TreeItem<RepoTreeItem> root = treeView.getRoot();
-        root.getChildren().clear();
+    private void updateTree() {
+        TreeItem<ItemContent> root = treeView.getRoot();
 
         for (RepositoryHandle handle : service.getRepositories()) {
-            Repository repo = handle.getRepository();
-            File workTree = repo.getWorkTree();
-            TreeItem<RepoTreeItem> repoRoot = new TreeItem<>(new RepoTreeItem(workTree));
-            root.getChildren().add(repoRoot);
+
+            Optional<TreeItem<ItemContent>> existingRepoItem = findExistingItemForRepository(root, handle);
+
+            if (!existingRepoItem.isPresent()) {
+                loadRepositoryTree(handle);
+            }
         }
     }
 
-    private void updateView() {
-        buildTree();
+    private Optional<TreeItem<ItemContent>> findExistingItemForRepository(TreeItem<ItemContent> root, RepositoryHandle handle) {
+        return root.getChildren().stream()
+                .filter(treeItem -> treeItem.getValue() != null
+                        && treeItem.getValue().getRepositoryHandle() == handle)
+                .findAny();
     }
 
-    private static FilenameFilter gitFolderFilter = (dir, name) -> !".git".equals(name);
+    private void loadRepositoryTree(RepositoryHandle handle) {
+        TreeItem<ItemContent> treeRoot = treeView.getRoot();
+
+        ItemContent repoItemContent = ItemContent.builder()
+                .file(handle.getRepository().getWorkTree())
+                .repositoryHandle(handle)
+                .build();
+
+        TreeItem<ItemContent> repoTreeItem = new TreeItem<>(repoItemContent);
+        repoItemContent.setTreeItem(repoTreeItem);
+        treeRoot.getChildren().add(repoTreeItem);
+
+        buildSubtree(repoTreeItem);
+    }
+
+    private void buildSubtree(TreeItem<ItemContent> treeItem) {
+        ItemContent content = treeItem.getValue();
+        if (!content.isDirectory()) {
+            return;
+        }
+        File[] files = content.getFile().listFiles(gitFolderFilter);
+
+        for (File file : files) {
+            ItemContent childItemContent = ItemContent.builder().file(file).build();
+            TreeItem<ItemContent> childItem = new TreeItem<>(childItemContent);
+            childItemContent.setTreeItem(childItem);
+            treeItem.getChildren().add(childItem);
+            buildSubtree(childItem);
+        }
+    }
+
+    private static final FilenameFilter gitFolderFilter = (dir, name) -> !".git".equals(name);
 }

@@ -1,34 +1,30 @@
 package pl.edu.agh.idziak.gittory.gui.root;
 
-import com.github.javaparser.JavaParser;
-import com.github.javaparser.ParseException;
 import com.github.javaparser.ast.CompilationUnit;
 import com.github.javaparser.ast.body.MethodDeclaration;
 import com.github.javaparser.ast.expr.NameExpr;
 import com.github.javaparser.ast.visitor.VoidVisitorAdapter;
-import com.google.common.base.Throwables;
-import com.google.common.io.Files;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
 import javafx.scene.control.Button;
+import javafx.scene.control.TreeItem;
 import javafx.scene.control.TreeView;
 import javafx.scene.layout.StackPane;
 import javafx.stage.DirectoryChooser;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import pl.edu.agh.idziak.gittory.gui.root.codearea.CodeAreaHandler;
-import pl.edu.agh.idziak.gittory.gui.root.repotree.RepoTreeItem;
+import pl.edu.agh.idziak.gittory.gui.root.findusages.FindUsagesWindowsHandler;
+import pl.edu.agh.idziak.gittory.gui.root.repotree.ItemContent;
 import pl.edu.agh.idziak.gittory.gui.root.repotree.RepoTreeViewHandler;
 import pl.edu.agh.idziak.gittory.logic.*;
+import pl.edu.agh.idziak.gittory.logic.findusages.FindUsagesExecutor;
+import pl.edu.agh.idziak.gittory.logic.findusages.FindUsagesOperation;
 
 import javax.inject.Inject;
 import java.io.File;
 import java.io.IOException;
-import java.io.StringReader;
 import java.net.URL;
-import java.nio.charset.StandardCharsets;
-import java.util.LinkedList;
-import java.util.List;
 import java.util.ResourceBundle;
 
 /**
@@ -40,19 +36,21 @@ public class RootPresenter implements Initializable {
 
     @FXML
     private StackPane codeAreaStackPane;
-
     @FXML
-    private TreeView<RepoTreeItem> repositoryTreeView;
-
+    private TreeView<ItemContent> repositoryTreeView;
     @FXML
     private Button buttonOpenRepo;
 
     @Inject
     private RepositoryService repositoryService;
 
-    private RepoTreeViewHandler repoTreeViewHandler;
+    private final FindUsagesExecutor findUsagesExecutor = new FindUsagesExecutor();
 
+    private RepoTreeViewHandler repoTreeViewHandler;
+    private FindUsagesWindowsHandler findUsagesWindowsHandler;
     private CodeAreaHandler codeAreaHandler;
+
+    private TreeItem<ItemContent> currentlyActiveFile;
 
     @Override
     public void initialize(URL location, ResourceBundle resources) {
@@ -71,59 +69,48 @@ public class RootPresenter implements Initializable {
 
         repoTreeViewHandler.addFileEventListener(event -> {
             if (event.getType() == Event.Type.FILE_DOUBLE_CLICKED) {
-                String fileContent = readFileContent(event.getPayload());
-                presentFileContent(fileContent, event.getPayload());
+                displayFileContent(event.getPayload());
             }
         });
+
+        findUsagesWindowsHandler = new FindUsagesWindowsHandler();
     }
 
-    private void presentFileContent(String fileContent, File file) {
-        boolean isJavaFile = file.getName().endsWith(".java");
+    private void displayFileContent(ItemContent item) {
+        if (item.isJavaFile()) {
+            ActiveCodeSpansBuilder builder = new ActiveCodeSpansBuilder();
 
-        if (isJavaFile) {
-            ActiveCodeSpansBuilder builder = new ActiveCodeSpansBuilder(new StringLayout(fileContent));
-            try {
-                CompilationUnit cu = JavaParser.parse(new StringReader(fileContent), true);
-                cu.accept(new CodeVisitor(), builder);
-            } catch (ParseException e) {
-                LOG.info("Parse error", e);
+            CompilationUnit compUnit = item.getCompilationUnit();
+            if (compUnit != null) {
+                compUnit.accept(new CodeVisitor(), builder);
             }
-
-            codeAreaHandler.replaceWithActiveJavaCode(fileContent, builder.activeCodeSpans);
+            codeAreaHandler.replaceWithActiveJavaCode(item.getFileContent(), builder.getActiveCodeSpans());
         } else {
-            codeAreaHandler.replaceWithPlainText(fileContent);
+            codeAreaHandler.replaceWithPlainText(item.getFileContent());
         }
+        currentlyActiveFile = item.getTreeItem();
     }
 
     private class CodeVisitor extends VoidVisitorAdapter<ActiveCodeSpansBuilder> {
         @Override
-        public void visit(MethodDeclaration n, ActiveCodeSpansBuilder builder) {
-            NameExpr nameExpr = n.getNameExpr();
-            int startPos = builder.stringLayout.toGlobalPosition(nameExpr.getBeginLine(), nameExpr.getBeginColumn());
-            int endPos = builder.stringLayout.toGlobalPosition(nameExpr.getEndLine(), nameExpr.getEndColumn());
-            ActiveCodeSpan span = ActiveCodeSpan.builder().startCol(startPos).endCol(endPos).build();
-            builder.activeCodeSpans.add(span);
-            super.visit(n, builder);
+        public void visit(MethodDeclaration methodDecl, ActiveCodeSpansBuilder builder) {
+            NameExpr expr = methodDecl.getNameExpr();
+            ActiveCodeSpan span = ActiveCodeSpan.builder()
+                    .startCol(expr.getBeginColumn())
+                    .endCol(expr.getEndColumn())
+                    .line(expr.getBeginLine())
+                    .clickCallback((point2D) -> RootPresenter.this.handleFindUsagesOfMethod(methodDecl))
+                    .build();
+            assert expr.getBeginLine() == expr.getEndLine();
+            builder.addActiveCodeSpan(span);
+            super.visit(methodDecl, builder);
         }
     }
 
-    private static class ActiveCodeSpansBuilder {
-        private List<ActiveCodeSpan> activeCodeSpans = new LinkedList<>();
-        private StringLayout stringLayout;
-
-        public ActiveCodeSpansBuilder(StringLayout stringLayout) {
-            this.stringLayout = stringLayout;
-        }
-    }
-
-    private String readFileContent(File file) {
-        try {
-            return Files.toString(file, StandardCharsets.UTF_8).replaceAll("\r","");
-        } catch (IOException e) {
-            LOG.error("Could not load file", e);
-            Throwables.propagate(e);
-        }
-        return null;
+    private void handleFindUsagesOfMethod(MethodDeclaration n) {
+        FindUsagesOperation operation = FindUsagesOperation.builder().methodDeclaration(n).treeItem(currentlyActiveFile).build();
+        findUsagesExecutor.executeOperation(operation);
+        findUsagesWindowsHandler.showFindUsagesWindow(operation);
     }
 
     private void loadRepositoryIntoService(File dir) {
