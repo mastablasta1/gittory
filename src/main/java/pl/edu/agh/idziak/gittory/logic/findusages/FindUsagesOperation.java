@@ -1,14 +1,10 @@
 package pl.edu.agh.idziak.gittory.logic.findusages;
 
 import com.github.javaparser.ast.body.MethodDeclaration;
-import com.github.javaparser.ast.expr.MethodCallExpr;
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
 import javafx.scene.control.TreeItem;
 import pl.edu.agh.idziak.gittory.gui.root.repotree.ItemContent;
-import pl.edu.agh.idziak.gittory.util.Observable;
-
-import java.util.ArrayList;
-import java.util.List;
-import java.util.function.Consumer;
 
 /**
  * Created by Tomasz on 16.05.2016.
@@ -16,8 +12,8 @@ import java.util.function.Consumer;
 public class FindUsagesOperation {
     private final MethodDeclaration methodDeclaration;
     private final TreeItem<ItemContent> treeItem;
-    private final List<MethodCallExpr> foundMethodUsages = new ArrayList<>();
-    private final Observable<MethodCallExpr> usageAddedObservable = new Observable<>();
+    private final ObservableList<MethodUsage> methodUsages = FXCollections.synchronizedObservableList(FXCollections.observableArrayList());
+    private boolean stopped;
 
     private FindUsagesOperation(Builder builder) {
         methodDeclaration = builder.methodDeclaration;
@@ -36,19 +32,21 @@ public class FindUsagesOperation {
         return treeItem;
     }
 
-    public synchronized List<MethodCallExpr> getFoundMethodUsages() {
-        return new ArrayList<>(foundMethodUsages);
+    void addMethodUsage(MethodUsage usage) {
+        methodUsages.add(usage);
     }
 
-    public synchronized void addUsageAddedObserver(Consumer<MethodCallExpr> observer) {
-        usageAddedObservable.addObserver(observer);
+    public ObservableList<MethodUsage> getMethodUsages() {
+        return FXCollections.unmodifiableObservableList(methodUsages);
     }
 
-    synchronized void addMethodUsage(MethodCallExpr usage) {
-        foundMethodUsages.add(usage);
-        usageAddedObservable.publishEvent(usage);
+    public void stop() {
+        stopped = true;
     }
 
+    public boolean isStopped() {
+        return stopped;
+    }
 
     public static final class Builder {
         private MethodDeclaration methodDeclaration;

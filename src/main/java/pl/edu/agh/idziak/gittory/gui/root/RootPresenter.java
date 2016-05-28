@@ -14,7 +14,7 @@ import javafx.stage.DirectoryChooser;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import pl.edu.agh.idziak.gittory.gui.root.codearea.CodeAreaHandler;
-import pl.edu.agh.idziak.gittory.gui.root.findusages.FindUsagesWindowsHandler;
+import pl.edu.agh.idziak.gittory.gui.root.findusages.FindUsagesWindowsManager;
 import pl.edu.agh.idziak.gittory.gui.root.repotree.ItemContent;
 import pl.edu.agh.idziak.gittory.gui.root.repotree.RepoTreeViewHandler;
 import pl.edu.agh.idziak.gittory.logic.*;
@@ -47,7 +47,7 @@ public class RootPresenter implements Initializable {
     private final FindUsagesExecutor findUsagesExecutor = new FindUsagesExecutor();
 
     private RepoTreeViewHandler repoTreeViewHandler;
-    private FindUsagesWindowsHandler findUsagesWindowsHandler;
+    private FindUsagesWindowsManager findUsagesWindowsManager;
     private CodeAreaHandler codeAreaHandler;
 
     private TreeItem<ItemContent> currentlyActiveFile;
@@ -73,7 +73,7 @@ public class RootPresenter implements Initializable {
             }
         });
 
-        findUsagesWindowsHandler = new FindUsagesWindowsHandler();
+        findUsagesWindowsManager = new FindUsagesWindowsManager();
     }
 
     private void displayFileContent(ItemContent item) {
@@ -110,7 +110,7 @@ public class RootPresenter implements Initializable {
     private void handleFindUsagesOfMethod(MethodDeclaration n) {
         FindUsagesOperation operation = FindUsagesOperation.builder().methodDeclaration(n).treeItem(currentlyActiveFile).build();
         findUsagesExecutor.executeOperation(operation);
-        findUsagesWindowsHandler.showFindUsagesWindow(operation);
+        findUsagesWindowsManager.showFindUsagesWindow(operation);
     }
 
     private void loadRepositoryIntoService(File dir) {

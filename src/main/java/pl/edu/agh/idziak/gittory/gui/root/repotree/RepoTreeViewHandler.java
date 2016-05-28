@@ -112,24 +112,27 @@ public class RepoTreeViewHandler {
         repoItemContent.setTreeItem(repoTreeItem);
         treeRoot.getChildren().add(repoTreeItem);
 
-        buildSubtree(repoTreeItem);
+        buildSubtree(repoTreeItem, handle);
     }
 
-    private void buildSubtree(TreeItem<ItemContent> treeItem) {
+    private void buildSubtree(TreeItem<ItemContent> treeItem, RepositoryHandle repositoryHandle) {
         ItemContent content = treeItem.getValue();
         if (!content.isDirectory()) {
             return;
         }
-        File[] files = content.getFile().listFiles(gitFolderFilter);
+        File[] files = content.getFile().listFiles(hiddenFolderFilter);
 
         for (File file : files) {
-            ItemContent childItemContent = ItemContent.builder().file(file).build();
+            ItemContent childItemContent = ItemContent.builder()
+                    .file(file)
+                    .repositoryHandle(repositoryHandle)
+                    .build();
             TreeItem<ItemContent> childItem = new TreeItem<>(childItemContent);
             childItemContent.setTreeItem(childItem);
             treeItem.getChildren().add(childItem);
-            buildSubtree(childItem);
+            buildSubtree(childItem, repositoryHandle);
         }
     }
 
-    private static final FilenameFilter gitFolderFilter = (dir, name) -> !".git".equals(name);
+    private static final FilenameFilter hiddenFolderFilter = (dir, name) -> !name.startsWith(".");
 }

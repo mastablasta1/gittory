@@ -7,13 +7,19 @@ import org.eclipse.jgit.lib.Repository;
  */
 public class RepositoryHandle {
     private Repository repository;
+    private String name;
 
     public RepositoryHandle(Repository repository) {
         this.repository = repository;
+        name = repository.getWorkTree().getName();
     }
 
 
     public Repository getRepository() {
         return repository;
+    }
+
+    public String getName() {
+        return name;
     }
 }

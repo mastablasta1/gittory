@@ -58,6 +58,10 @@ public class ItemContent {
         return file.isFile();
     }
 
+    public boolean isRepository() {
+        return treeItem.getParent().getValue() == null;
+    }
+
     @Override
     public String toString() {
         return file.getName();
@@ -65,6 +69,10 @@ public class ItemContent {
 
     public boolean isJavaFile() {
         return file.isFile() && file.getName().endsWith(".java");
+    }
+
+    public boolean isParsedJavaFile() {
+        return compilationUnit != null;
     }
 
     public TreeItem<ItemContent> getTreeItem() {
