@@ -135,4 +135,8 @@ public class RepoTreeViewHandler {
     }
 
     private static final FilenameFilter hiddenFolderFilter = (dir, name) -> !name.startsWith(".");
+
+    public void setSelectedItem(ItemContent itemContent) {
+        treeView.getSelectionModel().select(itemContent.getTreeItem());
+    }
 }

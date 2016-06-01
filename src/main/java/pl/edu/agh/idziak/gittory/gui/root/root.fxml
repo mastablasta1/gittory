@@ -13,7 +13,7 @@
    <top>
       <ToolBar prefHeight="40.0" prefWidth="200.0" BorderPane.alignment="CENTER">
         <items>
-          <Button mnemonicParsing="false" text="Button" fx:id="buttonOpenRepo" />
+          <Button mnemonicParsing="false" text="Open Git repository" fx:id="buttonOpenRepo" />
         </items>
       </ToolBar>
    </top>

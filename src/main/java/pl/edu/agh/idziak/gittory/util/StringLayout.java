@@ -47,4 +47,8 @@ public class StringLayout {
         }
         throw new IllegalArgumentException("Position exceeds string length");
     }
+
+    public Pair<Integer, Integer> getLinePositionAndLength(int line) {
+        return lineList.get(line - 1);
+    }
 }

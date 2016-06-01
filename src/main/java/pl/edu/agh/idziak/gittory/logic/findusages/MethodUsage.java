@@ -1,17 +1,21 @@
 package pl.edu.agh.idziak.gittory.logic.findusages;
 
 import com.github.javaparser.ast.expr.MethodCallExpr;
+import com.google.common.base.Preconditions;
+import pl.edu.agh.idziak.gittory.gui.root.repotree.ItemContent;
 import pl.edu.agh.idziak.gittory.logic.RepositoryHandle;
 
 /**
  * Created by Tomasz on 22.05.2016.
  */
 public class MethodUsage {
+    private ItemContent itemContent;
     private String className;
     private String path;
     private RepositoryHandle repository;
     private int line;
     private MethodCallExpr methodCallExpr;
+    private MethodUsageViewHandle viewHandle;
 
     private MethodUsage(Builder builder) {
         className = builder.className;
@@ -19,7 +23,10 @@ public class MethodUsage {
         repository = builder.repository;
         line = builder.line;
         methodCallExpr = builder.methodCallExpr;
+        viewHandle = builder.viewHandle;
+        itemContent = builder.itemContent;
     }
+
 
     public static Builder newBuilder() {
         return new Builder();
@@ -41,10 +48,17 @@ public class MethodUsage {
         return methodCallExpr;
     }
 
+    public ItemContent getItemContent() {
+        return itemContent;
+    }
+
     public int getLine() {
         return line;
     }
 
+    public void viewDoubleClicked() {
+        Preconditions.checkNotNull(viewHandle).doubleClick(this);
+    }
 
     public static final class Builder {
         private String className;
@@ -52,6 +66,8 @@ public class MethodUsage {
         private RepositoryHandle repository;
         private int line;
         private MethodCallExpr methodCallExpr;
+        private MethodUsageViewHandle viewHandle;
+        private ItemContent itemContent;
 
         private Builder() {
         }
@@ -78,6 +94,16 @@ public class MethodUsage {
 
         public Builder methodCallExpr(MethodCallExpr val) {
             methodCallExpr = val;
+            return this;
+        }
+
+        public Builder itemContent(ItemContent val) {
+            itemContent = val;
+            return this;
+        }
+
+        public Builder viewHandle(MethodUsageViewHandle val) {
+            viewHandle = val;
             return this;
         }
 

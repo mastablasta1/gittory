@@ -9,9 +9,7 @@ import org.slf4j.LoggerFactory;
 import pl.edu.agh.idziak.gittory.gui.root.repotree.ItemContent;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -21,14 +19,14 @@ import java.util.concurrent.Executors;
 public class FindUsagesExecutor {
     private static final Logger LOG = LoggerFactory.getLogger(FindUsagesExecutor.class);
 
-    private Map<FindUsagesOperation, Integer> jobMap = new HashMap<>();
     private ExecutorService executorService = Executors.newCachedThreadPool();
+    private MethodUsageViewHandle viewHandle;
+
+    public FindUsagesExecutor(MethodUsageViewHandle viewHandle) {
+        this.viewHandle = viewHandle;
+    }
 
     public void executeOperation(FindUsagesOperation operation) {
-        if (jobMap.containsKey(operation)) {
-            throw new IllegalStateException("Operation already running");
-        }
-
         executorService.submit(getTaskForOperation(operation));
     }
 
@@ -44,23 +42,17 @@ public class FindUsagesExecutor {
 
     private void doExecuteOperation(FindUsagesOperation operation) {
         ItemContent origin = operation.getTreeItem().getValue();
+        TreeItem<ItemContent> treeRoot = findTreeRoot(origin.getTreeItem());
 
-        findUsagesInFile(origin, operation);
-        walkUpTree(origin, operation);
+        treeRoot.getChildren().forEach(repoTreeItem -> walkDownTree(repoTreeItem, operation));
     }
 
-    private void walkUpTree(ItemContent currentItem, FindUsagesOperation operation) {
-        TreeItem<ItemContent> currentTreeItem = currentItem.getTreeItem();
-        if (currentItem.isRepository()) {
-            return;
+    private TreeItem<ItemContent> findTreeRoot(TreeItem<ItemContent> origin) {
+        TreeItem<ItemContent> current = origin;
+        while (current.getParent() != null) {
+            current = current.getParent();
         }
-
-        TreeItem<ItemContent> parent = currentTreeItem.getParent();
-        ArrayList<TreeItem<ItemContent>> treeItems = new ArrayList<>(parent.getChildren());
-        treeItems.remove(currentTreeItem);
-
-        treeItems.forEach(item -> processTreeItem(item, operation));
-        walkUpTree(parent.getValue(), operation);
+        return current;
     }
 
     private void processTreeItem(TreeItem<ItemContent> treeItem, FindUsagesOperation operation) {
@@ -82,9 +74,9 @@ public class FindUsagesExecutor {
         }
     }
 
-    private void findUsagesInFile(ItemContent origin, FindUsagesOperation operation) {
-        LOG.info("Searching usages in: " + origin.getFile().getAbsolutePath());
-        CompilationUnit cu = origin.getCompilationUnit();
+    private void findUsagesInFile(ItemContent item, FindUsagesOperation operation) {
+        LOG.info("Searching usages in: " + item.getFile().getAbsolutePath());
+        CompilationUnit cu = item.getCompilationUnit();
         Accumulator accumulator = new Accumulator();
         accumulator.desirableMethodName = operation.getMethodDeclaration().getName();
         cu.accept(new MethodCallVisitor(), accumulator);
@@ -92,9 +84,11 @@ public class FindUsagesExecutor {
             MethodUsage methodUsage = MethodUsage.newBuilder()
                     .methodCallExpr(methodCall)
                     .className(cu.getTypes().get(0).getName())
-                    .repository(origin.getRepositoryHandle())
+                    .repository(item.getRepositoryHandle())
                     .line(methodCall.getBeginLine())
                     .path(cu.getPackage().getName().toStringWithoutComments())
+                    .viewHandle(viewHandle)
+                    .itemContent(item)
                     .build();
             operation.addMethodUsage(methodUsage);
         });

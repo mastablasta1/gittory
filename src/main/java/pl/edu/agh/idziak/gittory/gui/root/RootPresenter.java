@@ -6,6 +6,7 @@ import com.github.javaparser.ast.expr.NameExpr;
 import com.github.javaparser.ast.visitor.VoidVisitorAdapter;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
+import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.TreeItem;
 import javafx.scene.control.TreeView;
@@ -20,6 +21,7 @@ import pl.edu.agh.idziak.gittory.gui.root.repotree.RepoTreeViewHandler;
 import pl.edu.agh.idziak.gittory.logic.*;
 import pl.edu.agh.idziak.gittory.logic.findusages.FindUsagesExecutor;
 import pl.edu.agh.idziak.gittory.logic.findusages.FindUsagesOperation;
+import pl.edu.agh.idziak.gittory.logic.findusages.MethodUsageViewHandle;
 
 import javax.inject.Inject;
 import java.io.File;
@@ -44,13 +46,30 @@ public class RootPresenter implements Initializable {
     @Inject
     private RepositoryService repositoryService;
 
-    private final FindUsagesExecutor findUsagesExecutor = new FindUsagesExecutor();
+    private final FindUsagesExecutor findUsagesExecutor;
 
     private RepoTreeViewHandler repoTreeViewHandler;
     private FindUsagesWindowsManager findUsagesWindowsManager;
     private CodeAreaHandler codeAreaHandler;
 
     private TreeItem<ItemContent> currentlyActiveFile;
+
+    public RootPresenter() {
+        MethodUsageViewHandle viewHandle = MethodUsageViewHandle.newBuilder()
+                .doubleClickCallback(param -> {
+                    repoTreeViewHandler.setSelectedItem(param.getItemContent());
+                    displayFileContent(param.getItemContent());
+                    codeAreaHandler.selectLine(param.getLine());
+                    getScene().getWindow().requestFocus();
+                    return null;
+                }).build();
+
+        findUsagesExecutor = new FindUsagesExecutor(viewHandle);
+    }
+
+    private Scene getScene() {
+        return codeAreaStackPane.getScene();
+    }
 
     @Override
     public void initialize(URL location, ResourceBundle resources) {

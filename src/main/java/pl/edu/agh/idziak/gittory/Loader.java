@@ -17,7 +17,7 @@ public class Loader extends Application {
 
         RootView rootView = new RootView();
 
-        Scene scene = new Scene(rootView.getView(), 800, 600);
+        Scene scene = new Scene(rootView.getView(), 1200, 800);
 
         scene.getStylesheets().add(CodeAreaHandler.class.getResource("java-keywords.css").toExternalForm());
         primaryStage.setScene(scene);

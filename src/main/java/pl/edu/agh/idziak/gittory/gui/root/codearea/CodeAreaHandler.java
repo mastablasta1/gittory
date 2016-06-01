@@ -87,6 +87,14 @@ public class CodeAreaHandler {
         codeArea.replaceText(fileContent);
     }
 
+    public void selectLine(int line) {
+        Pair<Integer, Integer> posAndLength = currentStringLayout.getLinePositionAndLength(line);
+        int start = posAndLength.getKey();
+        int end = start + posAndLength.getValue();
+        //codeArea.moveTo(codeArea.position(line - 1, 0).toOffset());
+        codeArea.selectRange(start, end-1);
+    }
+
     private StyleSpans<Collection<String>> computeHighlighting(String text) {
         StyleSpansBuilder<Collection<String>> spansBuilder = new StyleSpansBuilder<>();
         if (highlightJavaCode) {

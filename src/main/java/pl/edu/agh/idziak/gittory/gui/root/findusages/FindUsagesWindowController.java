@@ -5,6 +5,7 @@ import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
 import javafx.scene.control.Label;
 import javafx.scene.control.TableColumn;
+import javafx.scene.control.TableRow;
 import javafx.scene.control.TableView;
 import pl.edu.agh.idziak.gittory.logic.findusages.FindUsagesOperation;
 import pl.edu.agh.idziak.gittory.logic.findusages.MethodUsage;
@@ -42,6 +43,14 @@ public class FindUsagesWindowController implements Initializable {
     @Override
     public void initialize(URL location, ResourceBundle resources) {
         TableColumns tableColumns = new TableColumns();
+        usagesTableView.setRowFactory(view -> {
+            TableRow<MethodUsage> row = new TableRow<>();
+            row.setOnMouseClicked(event -> {
+                if (event.getClickCount() == 2)
+                    row.getItem().viewDoubleClicked();
+            });
+            return row;
+        });
         usagesTableView.getColumns().addAll(tableColumns.getAll());
     }
 
