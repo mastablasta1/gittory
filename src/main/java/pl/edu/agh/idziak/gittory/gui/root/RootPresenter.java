@@ -8,10 +8,19 @@ import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
+import javafx.scene.control.Label;
 import javafx.scene.control.TreeItem;
 import javafx.scene.control.TreeView;
+import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.StackPane;
 import javafx.stage.DirectoryChooser;
+import org.eclipse.jgit.api.Git;
+import org.eclipse.jgit.api.errors.GitAPIException;
+import org.eclipse.jgit.lib.Constants;
+import org.eclipse.jgit.lib.PersonIdent;
+import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.revwalk.RevCommit;
+import org.eclipse.jgit.revwalk.RevWalk;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import pl.edu.agh.idziak.gittory.gui.root.codearea.CodeAreaHandler;
@@ -27,6 +36,9 @@ import javax.inject.Inject;
 import java.io.File;
 import java.io.IOException;
 import java.net.URL;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.Iterator;
 import java.util.ResourceBundle;
 
 /**
@@ -36,6 +48,10 @@ public class RootPresenter implements Initializable {
 
     private static final Logger LOG = LoggerFactory.getLogger(RootPresenter.class);
 
+    @FXML
+    public Label labelFileInfo;
+    @FXML
+    private BorderPane rightBorderPane;
     @FXML
     private StackPane codeAreaStackPane;
     @FXML
@@ -107,7 +123,44 @@ public class RootPresenter implements Initializable {
         } else {
             codeAreaHandler.replaceWithPlainText(item.getFileContent());
         }
+
+        showFileInfo(item);
         currentlyActiveFile = item.getTreeItem();
+    }
+
+    private void showFileInfo(ItemContent item) {
+        try {
+            failableShowFileInfo(item);
+        } catch (Exception e) {
+            labelFileInfo.setText("(Could not fetch item info)");
+        }
+    }
+
+    private void failableShowFileInfo(ItemContent item) throws IOException {
+        Repository jgitRepo = item.getRepositoryHandle().getRepository();
+        RevWalk revCommits = new RevWalk(jgitRepo);
+        RevCommit commit = revCommits.parseCommit(jgitRepo.resolve(Constants.HEAD));
+
+        try {
+            Git git = new Git(jgitRepo);
+            String repoPath = item.getRepositoryHandle().getRepository().getWorkTree().toURI().relativize(item.getFile().toURI()).getPath();
+            Iterable<RevCommit> commits = git.log().addPath(repoPath).call();
+
+            Iterator<RevCommit> iterator = commits.iterator();
+            if (iterator.hasNext()) {
+                RevCommit lastCommit = iterator.next();
+                PersonIdent authorIdent = lastCommit.getAuthorIdent();
+                String name = authorIdent.getName();
+                Date when = authorIdent.getWhen();
+                labelFileInfo.setText("Last commit by " + name + " on " + new SimpleDateFormat("hh:mm dd.MM.yyyy").format(when));
+            } else {
+                labelFileInfo.setText("File not commited");
+            }
+        } catch (GitAPIException e) {
+            e.printStackTrace();
+        }
+
+
     }
 
     private class CodeVisitor extends VoidVisitorAdapter<ActiveCodeSpansBuilder> {
